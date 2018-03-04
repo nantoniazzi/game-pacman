@@ -16,16 +16,10 @@ public class Referee extends AbstractReferee {
     public Properties init(Properties params) {
         gameManager.setFrameDuration(200);
         world.init(Long.valueOf((String) params.get("seed")));
-
-        int playerId = 1;
-        for (Player player : gameManager.getActivePlayers()) {
-            player.init(playerId++);
-        }
-
         return params;
     }
 
-    private int countdown = -100;
+    private int countdown = -400;
     private int checkWinner() {
         return countdown++;
     }

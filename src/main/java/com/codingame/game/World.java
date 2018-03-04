@@ -60,14 +60,20 @@ public class World {
     @Inject private GraphicEntityModule graphicEntityModule;
     @Inject private GameManager<Player> gameManager;
     @Inject private Provider<Ghost> ghostProvider;
-
-    private String[] level = LEVEL1;
+    @Inject private HUD hud;
+    
+    private String[] level = LEVEL1; 
     private Random random = new Random();
     private Group group;
     private List<Ghost> ghosts = new ArrayList<>();
-
     private Map<String, Entity<?>> entities = new HashMap<>();
-
+    private String[] initialsPath = {
+            "",
+            "UUU",
+            "UDUDUDUDUDUDUDURRUU",
+            "UDUDUDUDUDUDUDUDUDUDUDUDUDUDULLUU",
+    };
+    
     private String coordToKey(int column, int row) {
         return String.format("%d-%d", column, row);
     }
@@ -94,13 +100,20 @@ public class World {
         group.setX((graphicEntityModule.getWorld().getWidth() / 2) - (int) (CELL_WIDTH * level[0].length() * 0.5));
         group.setY(10);
 
+        int playerId = 1;
+        for (Player player : gameManager.getActivePlayers()) {
+            player.init(playerId++);
+        }
+
         for (int ghostId : getAllGhostIds()) {
             Ghost ghost = ghostProvider.get();
             ghosts.add(ghost);
 
-            ghost.init(ghostId);
-            ghost.update();
+            String initialPath = initialsPath[ghostId - 1];
+            ghost.init(ghostId, Direction.pathToDirections(initialPath));
         }
+        
+        hud.init();
 
         for (int rowIndex = 0; rowIndex < level.length; rowIndex++) {
             String row = level[rowIndex];
@@ -243,6 +256,38 @@ public class World {
         return nearestPos;
     }
 
+    public Point getPosToFleeNearestPlayer(Set<Point> nextPossiblePos) {
+        Point furthestPos = null;
+        double furthestDist = 0;
+
+        for (Player player : gameManager.getActivePlayers()) {
+            for (Point pos : nextPossiblePos) {
+                double dist = pos.distance(player.getPos());
+                if (furthestPos == null || furthestDist < dist) {
+                    furthestPos = pos;
+                    furthestDist = dist;
+                }
+            }
+        }
+
+        return furthestPos;
+    }
+    
+    public Point getPosToReachGhostHome(Set<Point> nextPossiblePos) {
+        Point nextPos = null;
+        double nextDist = 0;
+
+        for (Point pos : nextPossiblePos) {
+            double dist = pos.distance(new Point(13, 11));
+            if (nextPos == null || nextDist > dist) {
+                nextPos = pos;
+                nextDist = dist;
+            }
+        }
+
+        return nextPos;
+    }
+
     public Point getGhostInitialPos(int id) {
         Point pos = null;
 
@@ -288,7 +333,7 @@ public class World {
         for (Ghost ghost : ghosts) {
             ghost.update();
         }
-
+        
         // check if a ghost and a player have swapped or if they are on the same cell
         for (Ghost ghost : ghosts) {
             for (Player player : gameManager.getActivePlayers()) {
@@ -304,16 +349,18 @@ public class World {
         // check if a player eats a gum
         for (Player player : gameManager.getActivePlayers()) {
             if (getCell(player.getPos()) == '.') {
-                player.eatGum(10);
+                player.eatGum();
                 eatGum(player.getPos());
             } else if (getCell(player.getPos()) == 'o') {
-                player.eatSuperGum(100);
+                player.eatSuperGum();
                 eatGum(player.getPos());
                 for(Ghost ghost : ghosts) {
-                    ghost.vulnerable(10);
+                    ghost.vulnerable();
                 }
             }
         }
+        
+        hud.update();
     }
 
     private void eatGum(Point pos) {
@@ -325,5 +372,4 @@ public class World {
         graphicEntityModule.commitEntityState(0.5, gum);
         gum.setAlpha(0);
     }
-
 }
