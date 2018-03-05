@@ -56,10 +56,6 @@ public class Player1 {
             System.out.println("RIGHT");
             System.out.println("RIGHT");
             System.out.println("RIGHT");
-            System.out.println("RIGHT");
-            System.out.println("RIGHT");
-            System.out.println("RIGHT");
-            System.out.println("RIGHT");
             System.out.println("UP");
             System.out.println("UP");
             System.out.println("UP");

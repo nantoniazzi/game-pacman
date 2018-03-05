@@ -15,7 +15,9 @@ public class Referee extends AbstractReferee {
     @Override
     public Properties init(Properties params) {
         gameManager.setFrameDuration(200);
-        world.init(Long.valueOf((String) params.get("seed")));
+        long seed = 373620243; //Long.valueOf((String) params.get("seed"));
+        System.err.println(seed);
+        world.init(seed);
         return params;
     }
 

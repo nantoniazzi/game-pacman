@@ -21,6 +21,10 @@ public class Ghost {
 
     private static final String EVENT_PLAYER_CONTACT = "EVENT_PLAYER_CONTACT";
     private static final String EVENT_PLAYER_EAT_SUPER_GUM = "EVENT_PLAYER_EAT_SUPER_GUM";
+    
+    private static final int VULNERABLE_TURNS_MAX = 40;
+    private static final int VULNERABLE_TURNS_BLINK = 10;
+    
 
     @Inject World world;
     @Inject GraphicEntityModule entityManager;
@@ -42,6 +46,8 @@ public class Ghost {
     private Group deathAnimationGroup;
     private SpriteAnimation fleeNormal;
     private SpriteAnimation fleeBlink;
+    private int stepPerCell = 1;
+    private int fleeTurns = 0;
 
     private List<Direction> initialPath;
 
@@ -72,6 +78,7 @@ public class Ghost {
             @Override
             public void init() {
                 attackAnimationGroup.setVisible(true);
+                vulnerableRemainingTurns = 0;
             }
 
             @Override
@@ -115,7 +122,9 @@ public class Ghost {
             @Override
             public void init() {
                 //                vulnerableRemainingTurns = 20;
-                vulnerableRemainingTurns = 20;
+                vulnerableRemainingTurns = VULNERABLE_TURNS_MAX;
+                fleeTurns = 0;
+                stepPerCell = 2;
                 fleeAnimationGroup.setVisible(true);
                 fleeNormal.setVisible(true);
                 fleeBlink.setVisible(false);
@@ -125,7 +134,7 @@ public class Ghost {
             public void update() {
                 vulnerableRemainingTurns--;
 
-                if (vulnerableRemainingTurns == 5) {
+                if (vulnerableRemainingTurns == VULNERABLE_TURNS_BLINK) {
                     fleeNormal.setVisible(false);
                     fleeBlink.setVisible(true);
                 } else if (vulnerableRemainingTurns == 0) {
@@ -143,17 +152,22 @@ public class Ghost {
                 // I first check what is the best target position to flee from the nearest player
                 Point fleePos = world.getPosToFleeNearestPlayer(nextPossiblePos);
                 moveToPos(fleePos);
+                
+                fleeTurns++;
             }
 
             @Override
             public void exit() {
+                stepPerCell = 1;
                 fleeAnimationGroup.setVisible(false);
             }
 
             @Override
             public void event(String event, Object data) {
                 if (EVENT_PLAYER_EAT_SUPER_GUM.equals(event)) {
-                    vulnerableRemainingTurns = 10;
+                    vulnerableRemainingTurns = VULNERABLE_TURNS_MAX;
+                    fleeNormal.setVisible(true);
+                    fleeBlink.setVisible(false);
                 } else if (EVENT_PLAYER_CONTACT.equals(event)) {
                     fsm.setState(STATE_DEAD);
                 }
@@ -203,18 +217,29 @@ public class Ghost {
     }
 
     private void moveToPos(Point newPos) {
-        previousPos = pos;
-        pos = newPos;
-        direction = Direction.fromPoints(previousPos, pos);
-        updateDirectionAnimation();
-
         Point ghostRoomOffset = new Point(0, 0);
-        if (isInGhostRoom(pos)) {
+        if (isInGhostRoom(newPos)) {
             ghostRoomOffset = new Point(16, 14);
         }
 
         Point coord = world.posToCoord(pos);
+        int step = (fleeTurns % stepPerCell) + 1;
+        if(step < stepPerCell) {
+            double ratio = (double)step / (double)stepPerCell;
+            Point previousCoord = world.posToCoord(previousPos);
+            Point nextCoord = world.posToCoord(pos);
+            coord = new Point(previousCoord);
+            coord.x += (nextCoord.x - previousCoord.x) * ratio;
+            coord.y += (nextCoord.y - previousCoord.y) * ratio;
+        } else {
+            previousPos = pos;
+            pos = newPos;
+        }
         entity.setX(coord.x + OFFSET_X + ghostRoomOffset.x).setY(coord.y + OFFSET_Y + ghostRoomOffset.y);
+        
+        direction = Direction.fromPoints(pos, newPos);
+        updateDirectionAnimation();
+
     }
 
     public int getId() {
