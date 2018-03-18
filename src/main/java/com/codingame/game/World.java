@@ -2,6 +2,7 @@ package com.codingame.game;
 
 import java.awt.Point;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -13,6 +14,7 @@ import com.codingame.gameengine.core.GameManager;
 import com.codingame.gameengine.module.entities.Entity;
 import com.codingame.gameengine.module.entities.GraphicEntityModule;
 import com.codingame.gameengine.module.entities.Group;
+import com.codingame.gameengine.module.entities.Rectangle;
 import com.codingame.gameengine.module.entities.Sprite;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
@@ -34,15 +36,15 @@ public class World {
             "#.####.##.########.##.####.#",
             "#......##....##....##......#",
             "######.##### ## #####.######",
-            "     #.##### ## #####.#     ",
-            "     #.##    1     ##.#     ",
-            "     #.## ###--### ##.#     ",
+            "#    #.##### ## #####.#    #",
+            "#    #.##    A     ##.#    #",
+            "#    #.## ###--### ##.#    #",
             "######.## #      # ##.######",
-            ".....#A   #3 2 4 #   B#.....",
+            ".....#.1  #C B D #  2.#.....",
             "######.## #      # ##.######",
-            "     #.## ######## ##.#     ",
-            "     #.##          ##.#     ",
-            "     #.## ######## ##.#     ",
+            "#    #.## ######## ##.#    #",
+            "#    #.##          ##.#    #",
+            "#    #.## ######## ##.#    #",
             "######.## ######## ##.######",
             "#............##............#",
             "#.####.#####.##.#####.####.#",
@@ -57,34 +59,88 @@ public class World {
             "############################",
     };
 
+    private static final Map<Character, String> INITIAL_PATHS = new HashMap<>();
+    
+    static {
+        INITIAL_PATHS.put('A', "");
+        INITIAL_PATHS.put('B', "UUU");
+        INITIAL_PATHS.put('C', "UDUDUDUDUDUDUDURRUU");
+        INITIAL_PATHS.put('D', "UDUDUDUDUDUDUDUDUDUDUDUDUDUDULLUU");
+    }
+    
     @Inject private GraphicEntityModule graphicEntityModule;
     @Inject private GameManager<Player> gameManager;
     @Inject private Provider<Ghost> ghostProvider;
     @Inject private HUD hud;
-    
-    private String[] level = LEVEL1; 
+
+    private String[] level = LEVEL1;
     private Random random = new Random();
     private Group group;
     private List<Ghost> ghosts = new ArrayList<>();
     private Map<String, Entity<?>> entities = new HashMap<>();
-    private String[] initialsPath = {
-            "",
-            "UUU",
-            "UDUDUDUDUDUDUDURRUU",
-            "UDUDUDUDUDUDUDUDUDUDUDUDUDUDULLUU",
-    };
-    
+    private Map<String, List<Point>> teleportPoints = new HashMap<>();
+    private int gumCount = 0;
+
     private String coordToKey(int column, int row) {
         return String.format("%d-%d", column, row);
+    }
+    
+    private String buildTeleportKey(Point pos, Direction direction) {
+        return String.format("%d %d %s", pos.x, pos.y, direction.name());
     }
 
     public Random getRandom() {
         return random;
     }
 
+    private void initTeleportPoints() {
+        teleportPoints.clear();
+        for (int i = 0; i < level.length; i++) {
+            if (level[i].charAt(0) == '.') {
+                List<Point> listLeft = new ArrayList<>();
+                listLeft.add(new Point(level[i].length(), i));
+                listLeft.add(new Point(level[i].length() - 1, i));
+                teleportPoints.put(buildTeleportKey(new Point(-1, i), Direction.LEFT), listLeft);
+
+                List<Point> listRight = new ArrayList<>();
+                listRight.add(new Point(-1, i));
+                listRight.add(new Point(0, i));
+                teleportPoints.put(buildTeleportKey(new Point(level[i].length(), i), Direction.RIGHT), listRight);
+                
+                Rectangle maskLeft = graphicEntityModule.createRectangle()
+                        .setX(-CELL_WIDTH * 2)
+                        .setY(i * CELL_HEIGHT - CELL_HEIGHT)
+                        .setWidth(CELL_WIDTH * 2)
+                        .setHeight(CELL_HEIGHT * 3)
+                        .setFillColor(0)
+                        .setLineColor(0)
+                        .setZIndex(2);
+                
+                Rectangle maskRight = graphicEntityModule.createRectangle()
+                        .setX(level[i].length() * CELL_WIDTH)
+                        .setY(i * CELL_HEIGHT - CELL_HEIGHT)
+                        .setWidth(CELL_WIDTH * 2)
+                        .setHeight(CELL_HEIGHT * 3)
+                        .setFillColor(0)
+                        .setLineColor(0)
+                        .setZIndex(2);
+
+                group.add(maskLeft, maskRight);
+            }
+        }
+    }
+    
+    private void initGumCount() {
+        for (int i = 0; i < level.length; i++) {
+            if (level[i].charAt(0) == '.' || level[i].charAt(0) == 'o') {
+                gumCount++;
+            }
+        }
+    }
+
     public void init(long seed) {
         random.setSeed(seed);
-
+        
         graphicEntityModule.createSprite()
                 .setImage("Background.jpg")
                 .setAnchor(0);
@@ -102,17 +158,20 @@ public class World {
 
         int playerId = 1;
         for (Player player : gameManager.getActivePlayers()) {
-            player.init(playerId++);
+            player.init(group, playerId++);
         }
 
-        for (int ghostId : getAllGhostIds()) {
+        for (char ghostId : getAllGhostIds()) {
             Ghost ghost = ghostProvider.get();
             ghosts.add(ghost);
 
-            String initialPath = initialsPath[ghostId - 1];
-            ghost.init(ghostId, Direction.pathToDirections(initialPath));
+            String initialPath = INITIAL_PATHS.get(ghostId);
+            ghost.init(group, ghostId, Direction.pathToDirections(initialPath));
         }
-        
+
+        initTeleportPoints();
+        initGumCount();
+
         hud.init();
 
         for (int rowIndex = 0; rowIndex < level.length; rowIndex++) {
@@ -161,8 +220,38 @@ public class World {
         }
     }
 
+    public void sendLevel() {
+        for (Player player : gameManager.getActivePlayers()) {
+            player.sendInputLine(String.format("%d %d", level[0].length(), level.length));
+            for(String line : level) {
+                player.sendInputLine(line.replaceAll("[1-9A-Z]", " "));
+            }
+        }
+    }
+    
+    private Player getOpponent(Player player) {
+        for (Player p : gameManager.getPlayers()) {
+            if(p != player) {
+                return p;
+            }
+        }
+        
+        return null;
+    }
+
+    public void sendCharactersPositions() {
+        for (Player player : gameManager.getActivePlayers()) {
+            player.sendInputLine(String.format("%d %d", player.getPos().x, player.getPos().y));
+            player.sendInputLine(String.format("%d %d", getOpponent(player).getPos().x, getOpponent(player).getPos().y));
+            player.sendInputLine(String.valueOf(getAllGhostIds().size()));
+            for(Ghost g : ghosts) {
+                player.sendInputLine(String.format("%d %d %d %s", (g.getId() - 'A'), g.getPos().x, g.getPos().y, g.getState()));
+            }
+        }
+    }
+
     private Character getCell(int x, int y) {
-        Character cell = null;
+        Character cell = ' ';
         if (x >= 0 && y >= 0 && y < level.length && x < level[0].length()) {
             return level[y].charAt(x);
         }
@@ -174,16 +263,13 @@ public class World {
         return getCell(pos.x, pos.y);
     }
 
-    public Set<Integer> getAllGhostIds() {
-        Set<Integer> ids = new HashSet<>();
+    public Set<Character> getAllGhostIds() {
+        Set<Character> ids = new HashSet<>();
         for (int j = 0; j < level.length; j++) {
             for (int i = 0; i < level[j].length(); i++) {
                 char cell = getCell(i, j);
-                if (cell >= '1' && cell <= '9') {
-                    int id = Integer.valueOf(String.valueOf(cell));
-                    if (id >= 1 && id <= 9) {
-                        ids.add(id);
-                    }
+                if (cell >= 'A' && cell <= 'Z') {
+                    ids.add(cell);
                 }
             }
         }
@@ -256,23 +342,46 @@ public class World {
         return nearestPos;
     }
 
-    public Point getPosToFleeNearestPlayer(Set<Point> nextPossiblePos) {
+    public Point getPosToFleeNearestPlayer(Point currentPos, Set<Point> nextPossiblePos) {
+//        Point furthestPos = null;
+//        double furthestDist = 0;
+//
+//        for (Player player : gameManager.getActivePlayers()) {
+//            for (Point pos : nextPossiblePos) {
+//                double dist = pos.distance(player.getPos());
+//                if (furthestPos == null || furthestDist < dist) {
+//                    furthestPos = pos;
+//                    furthestDist = dist;
+//                }
+//            }
+//        }
+//
+//        return furthestPos;
+
+        Player closestPlayer = null;
+        double closestPlayerDist = 100000.0;
+        for(Player player : gameManager.getActivePlayers()) {
+            double dist = player.getPos().distance(currentPos);
+            if(dist < closestPlayerDist) {
+                closestPlayer = player;
+                closestPlayerDist = dist;
+            }
+        }
+
         Point furthestPos = null;
         double furthestDist = 0;
-
-        for (Player player : gameManager.getActivePlayers()) {
-            for (Point pos : nextPossiblePos) {
-                double dist = pos.distance(player.getPos());
-                if (furthestPos == null || furthestDist < dist) {
-                    furthestPos = pos;
-                    furthestDist = dist;
-                }
+        for (Point pos : nextPossiblePos) {
+            double dist = pos.distance(closestPlayer.getPos());
+            if (furthestPos == null || furthestDist < dist) {
+                furthestPos = pos;
+                furthestDist = dist;
             }
         }
 
         return furthestPos;
+
     }
-    
+
     public Point getPosToReachGhostHome(Set<Point> nextPossiblePos) {
         Point nextPos = null;
         double nextDist = 0;
@@ -288,7 +397,25 @@ public class World {
         return nextPos;
     }
 
-    public Point getGhostInitialPos(int id) {
+    public Point getGhostInitialPos(char id) {
+        Point pos = null;
+
+        for (int j = 0; j < level.length; j++) {
+            for (int i = 0; i < level[j].length(); i++) {
+                if (getCell(i, j) == id) {
+                    pos = new Point(i, j);
+                    break;
+                }
+            }
+        }
+        return pos;
+    }
+
+    public Point getGhostPos(char id) {
+        return ghosts.get(id - 1).getPos();
+    }
+
+    public Point getPlayerInitialPos(int id) {
         Point pos = null;
 
         for (int j = 0; j < level.length; j++) {
@@ -302,29 +429,16 @@ public class World {
         return pos;
     }
 
-    public Point getGhostPos(int id) {
-        return ghosts.get(id - 1).getPos();
-    }
-
-    public Point getPlayerInitialPos(int id) {
-        Point pos = null;
-
-        for (int j = 0; j < level.length; j++) {
-            for (int i = 0; i < level[j].length(); i++) {
-                if (getCell(i, j) == 'A' + (id - 1)) {
-                    pos = new Point(i, j);
-                    break;
-                }
-            }
-        }
-        return pos;
-    }
-
     public Point posToCoord(Point pos) {
-        return new Point(group.getX() + (pos.x * CELL_WIDTH), group.getY() + (pos.y * CELL_HEIGHT));
+        return posToCoord(pos, 0.5, 0.5);
     }
 
-    public void update() {
+    public Point posToCoord(Point pos, double anchorX, double anchorY) {
+        return new Point((pos.x * CELL_WIDTH) + (int)(anchorX * CELL_WIDTH), (pos.y * CELL_HEIGHT) + (int)(anchorY * CELL_HEIGHT));
+    }
+
+    public void update(int turn) {
+        gameManager.setFrameDuration(200);
         for (Player player : gameManager.getPlayers()) {
             player.update();
         }
@@ -333,16 +447,38 @@ public class World {
         for (Ghost ghost : ghosts) {
             ghost.update();
         }
-        
+
         // check if a ghost and a player have swapped or if they are on the same cell
+        double contactRatio = 0;
+        boolean freeze = false;
         for (Ghost ghost : ghosts) {
             for (Player player : gameManager.getActivePlayers()) {
-                //                System.err.println(String.format("P%d-G%d %s %s %s %s", player.getId(), ghost.getId(), player.getPos().toString(), ghost.getPos().toString(), player.getPreviousPos().toString(), ghost.getPreviousPos().toString()));
-                if (player.getPos().equals(ghost.getPos())
-                        || (player.getPos().equals(ghost.getPreviousPos()) && ghost.getPos().equals(player.getPreviousPos()))) {
-                    player.contact(ghost);
-                    ghost.contact(player);
+//                System.err.println(String.format("T%d P%d-G%d %s %s %s %s",turn, player.getId(), ghost.getId(), player.getPos().toString(), ghost.getPos().toString(), player.getPreviousPos().toString(), ghost.getPreviousPos().toString()));
+                if (player.getPos().equals(ghost.getPos())) {
+                    contactRatio = 1;
+                    player.contact(ghost, contactRatio);
+                    ghost.contact(player, contactRatio);
+                    freeze = true;
+                } else if (player.getPos().equals(ghost.getPreviousPos()) && ghost.getPos().equals(player.getPreviousPos())) {
+                    contactRatio = 0.5;
+                    player.contact(ghost, contactRatio);
+                    ghost.contact(player, contactRatio);
+                    freeze = true;
                 }
+            }
+        }
+        
+        if(contactRatio > 0 && gameManager.getFrameDuration() > 200) {
+//            gameManager.setFrameDuration(1200);
+            double freezeRatio = (200 * contactRatio) / (double)gameManager.getFrameDuration();
+            double unfreezeRatio = 1.0 - freezeRatio;
+            System.err.println(String.format("freezeratio = %f %f", freezeRatio, unfreezeRatio));
+            for(Ghost ghost : ghosts) {
+                ghost.freeze(freezeRatio);
+            }
+
+            for (Player player : gameManager.getPlayers()) {
+                player.freeze(freezeRatio);
             }
         }
 
@@ -354,12 +490,15 @@ public class World {
             } else if (getCell(player.getPos()) == 'o') {
                 player.eatSuperGum();
                 eatGum(player.getPos());
-                for(Ghost ghost : ghosts) {
+                for (Ghost ghost : ghosts) {
                     ghost.vulnerable();
                 }
             }
         }
-        
+        for (Ghost ghost : ghosts) {
+            ghost.debug();
+        }
+
         hud.update();
     }
 
@@ -371,5 +510,19 @@ public class World {
         gum.setAlpha(1.0);
         graphicEntityModule.commitEntityState(0.5, gum);
         gum.setAlpha(0);
+        gumCount--;
+    }
+
+    public List<Point> getTeleportExitPoints(Point newPos, Direction direction) {
+        List<Point> list = teleportPoints.get(buildTeleportKey(newPos, direction));
+        if (list == null) {
+            return Collections.emptyList();
+        }
+
+        return list;
+    }
+
+    public int getRemainingGumCount() {
+        return gumCount;
     }
 }

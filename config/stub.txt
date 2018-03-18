@@ -1,0 +1,27 @@
+read width:int height:int
+loop height read row:string(100)
+
+gameloop
+read meX:int meY:int
+read opponentX:int opponentY:int
+read ghostCount:int
+loop ghostCount read id:int x:int y:int state:word(50)
+
+write LEFT
+
+INPUT
+width:Number of columns in the level
+height:Number of rows in the level
+row:A row representation of the level. '#' = wall, '.' = gum, 'o' = energy gum, ' ' = empty cell
+meX:Your current x coordinate (column index) in the level
+meY:Your current y coordinate (row index) in the level
+opponentX:Your opponent current x coordinate (column index) in the level
+opponentY:Your opponent current y coordinate (row index) in the level
+ghostCount:Number of ghost in the map
+id:Ghost id
+x:Ghost current x coordinate (column index) in the level
+y:Ghost current y coordinate (row index) in the level
+state:Ghost current state (STATE_INIT, STATE_ATTACK, STATE_FLEE, STATE_DEAD)
+
+OUTPUT
+Your desired direction (LEFT, RIGHT, UP, DOWN)

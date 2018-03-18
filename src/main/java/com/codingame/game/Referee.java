@@ -11,30 +11,31 @@ import com.google.inject.Inject;
 public class Referee extends AbstractReferee {
     @Inject private GameManager<Player> gameManager;
     @Inject private World world;
-    
+
     @Override
     public Properties init(Properties params) {
         gameManager.setFrameDuration(200);
-        long seed = 373620243; //Long.valueOf((String) params.get("seed"));
+        //        long seed = -930797100;
+//        long seed = 1398541364;
+                long seed = Long.valueOf((String) params.get("seed"));
         System.err.println(seed);
         world.init(seed);
+        world.sendLevel();
+
         return params;
     }
 
-    private int countdown = -400;
-    private int checkWinner() {
-        return countdown++;
+    private boolean checkEndGame() {
+        return (world.getRemainingGumCount() == 0) || (gameManager.getActivePlayers().size() == 0);
     }
 
     @Override
     public void gameTurn(int turn) {
         System.err.println("TURN " + turn);
-        for (Player player : gameManager.getActivePlayers()) {
-            player.sendLevel();
-            player.execute();
-        }
+        world.sendCharactersPositions();
 
         for (Player player : gameManager.getActivePlayers()) {
+            player.execute();
             // Read inputs
             String directionStr = "";
             try {
@@ -49,21 +50,24 @@ public class Referee extends AbstractReferee {
                 player.setScore(-1);
                 gameManager.endGame();
             }
-
-            // check winner
-            int winner = checkWinner();
-            if (winner > 0) {
-                gameManager.addToGameSummary(GameManager.formatSuccessMessage(player.getNicknameToken() + " won!"));
-
-                gameManager.getPlayer(winner - 1).setScore(1);
-                gameManager.endGame();
-            }
         }
-        
-        world.update();
-        
-        if(gameManager.getActivePlayers().size() == 0) {
+
+        world.update(turn);
+
+        if (checkEndGame()) {
             gameManager.endGame();
+        }
+    }
+
+    @Override
+    public void onEnd() {
+        Player p0 = gameManager.getPlayer(0);
+        Player p1 = gameManager.getPlayer(1);
+        if (p0.getScore() == p1.getScore()) {
+            gameManager.addToGameSummary(GameManager.formatSuccessMessage("tie game!"));
+        } else {
+            Player winner = p0.getScore() > p1.getScore() ? p0 : p1;
+            gameManager.addToGameSummary(GameManager.formatSuccessMessage(winner.getNicknameToken() + " win!"));
         }
     }
 }

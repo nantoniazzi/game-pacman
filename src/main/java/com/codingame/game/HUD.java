@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.codingame.gameengine.core.GameManager;
+import com.codingame.gameengine.module.entities.Curve;
 import com.codingame.gameengine.module.entities.GraphicEntityModule;
 import com.codingame.gameengine.module.entities.Group;
 import com.codingame.gameengine.module.entities.Rectangle;
@@ -97,7 +98,9 @@ public class HUD {
                 .setX(entityModule.getWorld().getWidth() / 2)
                 .setY(17 * World.CELL_HEIGHT)
                 .setFontSize(World.CELL_HEIGHT)
+                .setStrokeColor(0xffffff)
                 .setFillColor(0xffffff)
+                .setStrokeThickness(0.5)
                 .setFontFamily(FONT_FAMILY);
     }
 

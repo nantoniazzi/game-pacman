@@ -6,8 +6,8 @@ public class Main {
         GameRunner gameRunner = new GameRunner();
 //        gameRunner.addAgent(Player1.class);
 //        gameRunner.addAgent(Player1.class);
-        gameRunner.addAgent("java -cp /home/nai/dev/git/game-pacman/target/test-classes Player1");
-        gameRunner.addAgent("java -cp /home/nai/dev/git/game-pacman/target/test-classes Player1");
+        gameRunner.addAgent("java -cp /home/nai/dev/git/game-pacman/target/test-classes Player2");
+        gameRunner.addAgent("java -cp /home/nai/dev/git/game-pacman/target/test-classes Player2");
         
         // gameRunner.addAgent("python3 /home/user/player.py");
         
