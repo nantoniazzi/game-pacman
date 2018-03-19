@@ -2,11 +2,9 @@ import java.awt.Point;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
-
-import com.codingame.game.Direction;
-import com.codingame.game.Player;
 
 /**
  * Auto-generated code below aims at helping you parse
@@ -19,8 +17,10 @@ class Player2 {
     String[] level;
     Scanner in = new Scanner(System.in);
     
+    Point myPreviousPos;
     Point myPos;
     Point opponentPos;
+    Random random = new Random();
     
     class Ghost {
         int id;
@@ -77,17 +77,35 @@ class Player2 {
             System.err.flush();
         }
 
-        Set<Point> nextPossiblePos = getNextPossiblePos(myPos);
-        System.err.println("next possible choices");
-        for(Point p : nextPossiblePos) {
-            System.err.println(String.format("%d %d", p.x, p.y));
+        List<Point> nextPossiblePos = getNextPossiblePos(myPos);
+        nextPossiblePos.remove(new Point(5, 14));
+        nextPossiblePos.remove(new Point(22, 14));
+        if (myPreviousPos != null) {
+            nextPossiblePos.remove(myPreviousPos);
         }
-        System.err.println();
+
+        //System.err.println("next possible choices");
+        for (Point p : nextPossiblePos) {
+            //System.err.println(String.format("%d %d", p.x, p.y));
+        }
+        //System.err.println();
         Point fleePos = getPosToFleeNearestGhost(myPos, nextPossiblePos);
-        System.err.println(String.format("CHOICE: %d %d => %f", fleePos.x, fleePos.y, myPos.distance(fleePos)));
+        if(random.nextBoolean()) {
+            fleePos = nextPossiblePos.get(random.nextInt(nextPossiblePos.size()));
+        }
+        //System.err.println(String.format("CHOICE: %d %d => %f", fleePos.x, fleePos.y, myPos.distance(fleePos)));
 
         Direction dir = Direction.fromPoints(myPos, fleePos);
+        
+        for(Ghost g : ghosts) {
+            if(g.pos == fleePos || g.pos == dir.fromPoint(fleePos) || g.pos == dir.fromPoint(dir.fromPoint(fleePos))) {
+                dir = dir.opposite();
+                break;
+            }
+        }
+        
         System.out.println(dir.name());
+        myPreviousPos = myPos;
     }
     
     public static void main(String args[]) {
@@ -147,8 +165,8 @@ class Player2 {
         return false;
     }
 
-    public Set<Point> getNextPossiblePos(Point pos) {
-        Set<Point> nextPos = new HashSet<>();
+    public List<Point> getNextPossiblePos(Point pos) {
+        List<Point> nextPos = new ArrayList<>();
         Point leftPos = new Point(pos.x - 1, pos.y);
         Point upPos = new Point(pos.x, pos.y - 1);
         Point rightPos = new Point(pos.x + 1, pos.y);
@@ -173,7 +191,7 @@ class Player2 {
         return nextPos;
     }
 
-    public Point getPosToFleeNearestGhost(Point myPos, Set<Point> nextPossiblePos) {
+    public Point getPosToFleeNearestGhost(Point myPos, List<Point> nextPossiblePos) {
         Ghost closestGhost = null;
         double closestGhostDist = 100000.0;
         for(Ghost g : ghosts) {
@@ -258,6 +276,30 @@ class Player2 {
                 case DOWN:
                     ret.y++;
                     break;
+            }
+            
+            return ret;
+        }
+        
+        public Direction opposite() {
+            Direction ret = this;
+            
+            switch(this) {
+            case LEFT:
+                ret = RIGHT;
+                break;
+
+            case RIGHT:
+                ret = LEFT;
+                break;
+
+            case UP:
+                ret = DOWN;
+                break;
+
+            case DOWN:
+                ret = UP;
+                break;
             }
             
             return ret;

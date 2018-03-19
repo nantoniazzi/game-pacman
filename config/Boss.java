@@ -2,6 +2,7 @@ import java.awt.Point;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -12,8 +13,10 @@ class Player {
     String[] level;
     Scanner in = new Scanner(System.in);
 
+    Point myPreviousPos;
     Point myPos;
     Point opponentPos;
+    Random random = new Random();
 
     class Ghost {
         int id;
@@ -26,16 +29,16 @@ class Player {
     void init() {
         int width = in.nextInt();
         int height = in.nextInt();
-//        System.err.println(String.format("%d %d", width, height));
-//        System.err.flush();
+        //System.err.println(String.format("%d %d", width, height));
+        //System.err.flush();
         if (in.hasNextLine()) {
             in.nextLine();
         }
         level = new String[height];
         for (int i = 0; i < height; i++) {
             level[i] = in.nextLine();
-//            System.err.println(String.format("%s", level[i]));
-//            System.err.flush();
+            //System.err.println(String.format("%s", level[i]));
+            //System.err.flush();
         }
     }
 
@@ -43,19 +46,19 @@ class Player {
         int meX = in.nextInt();
         int meY = in.nextInt();
         myPos = new Point(meX, meY);
-//        System.err.println(String.format("me: %d %d", meX, meY));
-//        System.err.flush();
+        //System.err.println(String.format("me: %d %d", meX, meY));
+        //System.err.flush();
 
         int opponentX = in.nextInt();
         int opponentY = in.nextInt();
         opponentPos = new Point(opponentX, opponentY);
-//        System.err.println(String.format("opp: %d %d", opponentX, opponentY));
-//        System.err.flush();
+        //System.err.println(String.format("opp: %d %d", opponentX, opponentY));
+        //System.err.flush();
 
         int ghostCount = in.nextInt();
         ghosts = new Ghost[ghostCount];
-//        System.err.println(String.format("ghost count: %d", ghostCount));
-//        System.err.flush();
+        //System.err.println(String.format("ghost count: %d", ghostCount));
+        //System.err.flush();
 
         for (int i = 0; i < ghostCount; i++) {
             Ghost g = new Ghost();
@@ -66,21 +69,39 @@ class Player {
             int y = in.nextInt();
             g.pos = new Point(x, y);
             g.state = in.next();
-//            System.err.println(String.format("ghost %d (%d, %d) - %s", g.id, x, y, g.state));
-//            System.err.flush();
+            //System.err.println(String.format("ghost %d (%d, %d) - %s", g.id, x, y, g.state));
+            //System.err.flush();
         }
 
-        Set<Point> nextPossiblePos = getNextPossiblePos(myPos);
-//        System.err.println("next possible choices");
-        for (Point p : nextPossiblePos) {
-//            System.err.println(String.format("%d %d", p.x, p.y));
+        List<Point> nextPossiblePos = getNextPossiblePos(myPos);
+        nextPossiblePos.remove(new Point(5, 14));
+        nextPossiblePos.remove(new Point(22, 14));
+        if (myPreviousPos != null) {
+            nextPossiblePos.remove(myPreviousPos);
         }
-//        System.err.println();
+
+        ////System.err.println("next possible choices");
+        for (Point p : nextPossiblePos) {
+            ////System.err.println(String.format("%d %d", p.x, p.y));
+        }
+        ////System.err.println();
         Point fleePos = getPosToFleeNearestGhost(myPos, nextPossiblePos);
-//        System.err.println(String.format("CHOICE: %d %d => %f", fleePos.x, fleePos.y, myPos.distance(fleePos)));
+        if (random.nextBoolean()) {
+            fleePos = nextPossiblePos.get(random.nextInt(nextPossiblePos.size()));
+        }
+        ////System.err.println(String.format("CHOICE: %d %d => %f", fleePos.x, fleePos.y, myPos.distance(fleePos)));
 
         Direction dir = Direction.fromPoints(myPos, fleePos);
+
+        for (Ghost g : ghosts) {
+            if (g.pos == fleePos || g.pos == dir.fromPoint(fleePos) || g.pos == dir.fromPoint(dir.fromPoint(fleePos))) {
+                dir = dir.opposite();
+                break;
+            }
+        }
+
         System.out.println(dir.name());
+        myPreviousPos = myPos;
     }
 
     public static void main(String args[]) {
@@ -127,8 +148,8 @@ class Player {
         return false;
     }
 
-    public Set<Point> getNextPossiblePos(Point pos) {
-        Set<Point> nextPos = new HashSet<>();
+    public List<Point> getNextPossiblePos(Point pos) {
+        List<Point> nextPos = new ArrayList<>();
         Point leftPos = new Point(pos.x - 1, pos.y);
         Point upPos = new Point(pos.x, pos.y - 1);
         Point rightPos = new Point(pos.x + 1, pos.y);
@@ -153,7 +174,7 @@ class Player {
         return nextPos;
     }
 
-    public Point getPosToFleeNearestGhost(Point myPos, Set<Point> nextPossiblePos) {
+    public Point getPosToFleeNearestGhost(Point myPos, List<Point> nextPossiblePos) {
         Ghost closestGhost = null;
         double closestGhostDist = 100000.0;
         for (Ghost g : ghosts) {
@@ -237,6 +258,30 @@ class Player {
 
             case DOWN:
                 ret.y++;
+                break;
+            }
+
+            return ret;
+        }
+
+        public Direction opposite() {
+            Direction ret = this;
+
+            switch (this) {
+            case LEFT:
+                ret = RIGHT;
+                break;
+
+            case RIGHT:
+                ret = LEFT;
+                break;
+
+            case UP:
+                ret = DOWN;
+                break;
+
+            case DOWN:
+                ret = UP;
                 break;
             }
 
